@@ -82,8 +82,265 @@
         <li><strong>Accuracy in Search Results:</strong> KMP ensures precise string matching, avoiding false positives and providing reliable search results.</li>
     </ul>
 
+    <pre><code>
+#include &lt;iostream&gt;
+#include &lt;vector&gt;
+#include &lt;string&gt;
+#include &lt;cstdlib&gt;
+#include &lt;ctime&gt;
+using namespace std;
+
+// Node structure for Binary Search Tree
+struct BSTNode {
+    string tankName;
+    int usageRate;
+    float refillTime;
+    string category;
+    BSTNode* left;
+    BSTNode* right;
+
+    BSTNode(string name, int rate, float time, string cat)
+        : tankName(name), usageRate(rate), refillTime(time), category(cat), left(nullptr), right(nullptr) {}
+};
+
+// Function prototype for suggestTankRefills
+void suggestTankRefills(const vector&lt;int&gt;& rates, int threshold);
+
+// Function to compute LPS array for KMP algorithm
+void computeLPSArray(const string&amp; pattern, vector&lt;int&gt;& lps) {
+    int length = 0;
+    int i = 1;
+    lps[0] = 0;
+
+    while (i &lt; pattern.length()) {
+        if (pattern[i] == pattern[length]) {
+            length++;
+            lps[i] = length;
+            i++;
+        } else {
+            if (length != 0) {
+                length = lps[length - 1];
+            } else {
+                lps[i] = 0;
+                i++;
+            }
+        }
+    }
+}
+
+// KMP String matching function
+bool KMPSearch(const string&amp; text, const string&amp; pattern) {
+    int m = pattern.length();
+    int n = text.length();
+
+    vector&lt;int&gt; lps(m, 0);
+    computeLPSArray(pattern, lps);
+
+    int i = 0;
+    int j = 0;
+    while (i &lt; n) {
+        if (pattern[j] == text[i]) {
+            i++;
+            j++;
+        }
+
+        if (j == m) {
+            return true;
+        } else if (i &lt; n &amp;&amp; pattern[j] != text[i]) {
+            if (j != 0) {
+                j = lps[j - 1];
+            } else {
+                i++;
+            }
+        }
+    }
+    return false;
+}
+
+// Function to insert a node into the BST
+BSTNode* insert(BSTNode* root, string name, int rate, float time, string category) {
+    if (root == nullptr) {
+        return new BSTNode(name, rate, time, category);
+    }
+    if (name &lt; root-&gt;tankName) {
+        root-&gt;left = insert(root-&gt;left, name, rate, time, category);
+    } else {
+        root-&gt;right = insert(root-&gt;right, name, rate, time, category);
+    }
+    return root;
+}
+
+// Function to search for tank details by tank name using KMP
+void searchTankDetails(BSTNode* root, const string&amp; tankName) {
+    if (root == nullptr) {
+        cout &lt;&lt; "Tank named \"" &lt;&lt; tankName &lt;&lt; "\" not found.\n";
+        return;
+    }
+
+    // Use KMP to search for the tank name in the current node's name
+    if (KMPSearch(root-&gt;tankName, tankName)) {
+        cout &lt;&lt; "Tank \"" &lt;&lt; root-&gt;tankName &lt;&lt; "\" details:\n";
+        cout &lt;&lt; "  Usage Rate: " &lt;&lt; root-&gt;usageRate &lt;&lt; "\n";
+        cout &lt;&lt; "  Refill Time: " &lt;&lt; root-&gt;refillTime &lt;&lt; " hours\n";
+        cout &lt;&lt; "  Category: " &lt;&lt; root-&gt;category &lt;&lt; "\n";
+        return;
+    }
+
+    if (tankName &lt; root-&gt;tankName) {
+        searchTankDetails(root-&gt;left, tankName);
+    } else {
+        searchTankDetails(root-&gt;right, tankName);
+    }
+}
+
+// Function to build BST from tank details
+BSTNode* buildBST(const vector&lt;string&gt;& names, const vector&lt;int&gt;& rates, const vector&lt;string&gt;& categories, const vector&lt;float&gt;& times) {
+    BSTNode* root = nullptr;
+    for (int i = 0; i &lt; names.size(); i++) {
+        root = insert(root, names[i], rates[i], times[i], categories[i]);
+    }
+    return root;
+}
+
+// Function to categorize tanks based on usage rate
+vector&lt;string&gt; categorizeTanks(const vector&lt;int&gt;& rates) {
+    vector&lt;string&gt; categories(rates.size());
+    int sum = 0;
+    for (int rate : rates) {
+        sum += rate;
+    }
+    float avgUsage = float(sum) / rates.size();
+
+    for (int i = 0; i &lt; rates.size(); i++) {
+        if (rates[i] &gt; avgUsage) {
+            categories[i] = "High Usage";
+        } else if (rates[i] &lt; avgUsage) {
+            categories[i] = "Low Usage";
+        } else {
+            categories[i] = "Average Usage";
+        }
+    }
+    return categories;
+}
+
+// Function to estimate refill time for each tank assume capacity is 10000
+vector&lt;float&gt; estimateRefillTime(const vector&lt;int&gt;& rates) {
+    vector&lt;float&gt; times(rates.size());
+    for (int i = 0; i &lt; rates.size(); i++) {
+        times[i] = (10000.0f / max(rates[i], 1)) * 0.1f;
+    }
+    return times;
+}
+
+// Insertion Sort to sort the tanks by usage rate
+void sortTanksByUsage(vector&lt;int&gt;& rates) {
+    int n = rates.size();
+    for (int i = 1; i &lt; n; i++) {
+        int key = rates[i];
+        int j = i - 1;
+        while (j &gt;= 0 &amp;&amp; rates[j] &gt; key) {
+            rates[j + 1] = rates[j];
+            j--;
+        }
+        rates[j + 1] = key;
+    }
+}
+
+void showSortedTanks(const vector&lt;int&gt;& rates) {
+    cout &lt;&lt; "\nSorted usage rates:\n";
+    for (int rate : rates) {
+        cout &lt;&lt; rate &lt;&lt; " ";
+    }
+    cout &lt;&lt; endl;
+}
+
+// Function to suggest tank refills
+void suggestTankRefills(const vector&lt;int&gt;& rates, int threshold) {
+    cout &lt;&lt; "\nTanks needing refills (usage above " &lt;&lt; threshold &lt;&lt; "):\n";
+    for (int i = 0; i &lt; rates.size(); i++) {
+        if (rates[i] &gt; threshold) {
+            cout &lt;&lt; "Tank \"" &lt;&lt; i + 1 &lt;&lt; "\" (Usage: " &lt;&lt; rates[i] &lt;&lt; ")\n";
+        }
+    }
+}
+
+// Function to generate random single-word tank names
+string generateTankName(int tankIndex) {
+    string names[] = {"blue", "black", "white", "orange", "yellow", "red", "pink", "grey", "green", "brown"};
+    srand(time(0) + tankIndex);
+    return names[rand() % 10];
+}
+
+// Function to display the menu
+void displayMenu() {
+    cout &lt;&lt; "\nMenu:\n";
+    cout &lt;&lt; "1. Show sorted tanks by usage rate\n";
+    cout &lt;&lt; "2. Search for tank details\n";
+    cout &lt;&lt; "3. Suggest tanks needing refills\n";
+    cout &lt;&lt; "4. Exit\n";
+}
+
+int main() {
+    int tankCount;
+    cout &lt;&lt; "How many water tanks do you have? ";
+    cin &gt;&gt; tankCount;
+
+    vector&lt;int&gt; usageRates(tankCount);
+    vector&lt;string&gt; tankNames(tankCount);
+
+    for (int i = 0; i &lt; tankCount; i++) {
+        tankNames[i] = generateTankName(i);
+        cout &lt;&lt; "Tank #" &lt;&lt; i + 1 &lt;&lt; ": " &lt;&lt; tankNames[i] &lt;&lt; endl;
+    }
+
+    cout &lt;&lt; "Enter the water usage rates for each tank:\n";
+    for (int i = 0; i &lt; tankCount; i++) {
+        cout &lt;&lt; tankNames[i] &lt;&lt; ": ";
+        cin &gt;&gt; usageRates[i];
+    }
+
+    sortTanksByUsage(usageRates);
+    vector&lt;string&gt; categories = categorizeTanks(usageRates);
+    vector&lt;float&gt; refillTimes = estimateRefillTime(usageRates);
+
+    BSTNode* bstRoot = buildBST(tankNames, usageRates, categories, refillTimes);
+
+    int choice;
+    string tankName;
+    while (true) {
+        displayMenu();
+        cin &gt;&gt; choice;
+
+        switch (choice) {
+            case 1:
+                showSortedTanks(usageRates);
+                break;
+            case 2:
+                cout &lt;&lt; "\nEnter a tank name to find its details: ";
+                cin &gt;&gt; tankName;
+                searchTankDetails(bstRoot, tankName);
+                break;
+            case 3:
+                int threshold;
+                cout &lt;&lt; "\nEnter the threshold for suggesting refills: ";
+                cin &gt;&gt; threshold;
+                suggestTankRefills(usageRates, threshold);
+                break;
+            case 4:
+                cout &lt;&lt; "Exiting the program.\n";
+                return 0;
+            default:
+                cout &lt;&lt; "Invalid choice, please try again.\n";
+        }
+    }
+
+    return 0;
+}
+    </code></pre>
+
     <footer>
         &copy; 2025 Water Management Solutions | Designed for efficient water supply systems.
     </footer>
 </body>
 </html>
+
